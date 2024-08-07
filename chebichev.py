@@ -3,14 +3,15 @@ import numpy as np
 import pypoman
 from scipy.spatial import ConvexHull
 
-# generate vertices for a 3D cube of side length l
-cw = 40
-ch = 10
-ss = 4
-cwh = cw/2 # large half side (top of pyramid)
+cw = 40 # width of top square
+ch = 10 # height of top cube
+ss = 4 # width/length of bottom square
+# Half side lengths
+cwh = cw/2
 chh = ch/2
-shs = ss/2 # small half side (bottom of pyramid)
+shs = ss/2
 
+# Cube vertices
 vertex_list_cube = [
     [ -cwh,-cwh,-chh ],
     [ cwh,-cwh,-chh ],
@@ -22,12 +23,12 @@ vertex_list_cube = [
     [ -cwh, cwh, chh ]
     ]
 
-# generate vertices for a 3D parallelogram
-# top square is of half-side lhs
+# vertices for a 3D parallelogram
+# top square is of half-side cwh
 # bottom square is of half-side shs
 # height is of half-side hL
-L = 30 
-hL = L/2
+L = 30  # height of parallelogram
+hL = L/2 # half height
 vertex_list_parallelogram = [
     [ -shs,-shs,-hL ],
     [ shs,-shs,-hL ],
@@ -39,38 +40,26 @@ vertex_list_parallelogram = [
     [ -cwh, cwh, hL ]
 ]
 
-# shift down by half of the top cube
+# shift down to match the bottom surface of the cube
 vertex_list_shifted_parallelogram = [[vertex[0], vertex[1], vertex[2]-chh-hL] for vertex in vertex_list_parallelogram ]
-
 vertex_list_concat = vertex_list_cube + vertex_list_shifted_parallelogram
-print(vertex_list_parallelogram)
-print(vertex_list_shifted_parallelogram)
 
 # compute convex hull
 hull = ConvexHull(vertex_list_concat)
-# vertices are guaranteed to be in counter clocwise order
-print(hull.vertices)
+# convex hull vertices are guaranteed to be in counter clocwise order
 vertex_list = [vertex_list_concat[vertex] for vertex in hull.vertices]
-vertex_list = vertex_list_concat
 
-print(vertex_list)
+A, b = pypoman.compute_polytope_halfspaces(np.array(vertex_list))
 
-vertices = map(
-    np.array,
-    vertex_list
-)
-type(vertices)
-
-A, b = pypoman.compute_polytope_halfspaces(vertices)
 vertices_computed = pypoman.compute_polytope_vertices(A, b)
-print(vertex_list)
-print(vertices_computed)
 result = pypoman.compute_chebyshev_center(A, b)
 center = result[0:3]
 radius = result[3]
 
-print("Center is :", center)
-print("Radius is :", radius)
+print("Top square side is {} / Bottom square side is {}".format(cwh, shs))
+print("Top cube height = {} / Parallelogram height = {} / Total height = {}".format(ch, L, L + ch))
+print("Chebyshev Center is :", center)
+print("Chebyshev Radius is :", radius)
 
 
 def set_aspect_equal_3d(ax):
@@ -97,8 +86,7 @@ def set_aspect_equal_3d(ax):
 
 # Plot a sphere of radius "radius" centered at center
 # Plot all 3D vertices as points
-def plot(vertices, center, radius):
-
+def plot(hull, vertices, center, radius):
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
 
@@ -119,9 +107,13 @@ def plot(vertices, center, radius):
     # plot a vector from center of length radius
     ax.quiver(center[0], center[1], center[2], radius, 0, 0, color='r')
 
+    for s in hull.simplices:
+        s = np.append(s, s[0])  # Here we cycle back to the first coordinate
+        v = np.array(vertices)
+        ax.plot(v[s, 0], v[s, 1], v[s, 2], "b-")
+
+    plt.title("Chebyshev Center: " + str(np.array(center).round(3)) + " Radius: " + str(round(radius,3)))
     set_aspect_equal_3d(ax)
-
-
     plt.show()
 
-plot(vertex_list, center, radius) 
+plot(hull, vertex_list, center, radius)
